@@ -1,10 +1,11 @@
 export type Id = string;
 
-export type Role = 'marketing' | 'ops' | 'member';
+export type Role = 'marketing' | 'ops' | 'brand' | 'member';
 
 export const ROLE_LABELS: Record<Role, string> = {
   marketing: 'Marketing (Kori)',
   ops: 'Ops',
+  brand: 'Brand (Fran)',
   member: 'Team member',
 };
 
@@ -53,12 +54,21 @@ export interface Version {
   steps: Step[];
 }
 
+export interface CreativeBrief {
+  goal: string;
+  keyMessage: string;
+  cta: string;
+  notes: string;
+  link: string;
+}
+
 export interface Email {
   id: Id;
   title: string;
   sendDate: string;
   sendTime: string | null;
   isLaunch: boolean; // labeled "Launch email"
+  brief: CreativeBrief;
   versions: Version[];
 }
 
@@ -110,10 +120,13 @@ export interface AppState {
 }
 
 export type StepKey =
+  | 'creative_brief'
+  | 'audience_brief'
   | 'design_submitted'
   | 'audiences_submitted'
   | 'design_approved_1'
   | 'design_approved_2'
   | 'audience_approved_1'
   | 'audience_approved_2'
+  | 'test_send'
   | 'email_sent';

@@ -123,7 +123,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     <Modal title="People & roles" onClose={onClose} wide>
       <div className="modal-body">
         <p className="muted-text">
-          Roles decide who can check approvals: <b>Marketing (Kori)</b> checks Stage 1, <b>Ops</b> checks Stage 2 and reports launch delays. Admins can do either.
+          Roles decide who can check what: <b>Marketing (Kori)</b> submits the creative brief and checks Stage 1; <b>Ops</b> notes the audience brief, checks Stage 2 and reports launch delays; <b>Brand (Fran)</b> or Kori signs off the test send. Admins can do anything.
           Anyone who opens the planner shows up here as a team member.
           {!admin && ' Only admins can change roles.'}
         </p>

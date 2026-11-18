@@ -2,7 +2,7 @@
 // database (claude.use("db")) and every viewer gets live updates. The workflow rules
 // (lib/workflow.ts, lib/launch.ts) are checked here before any write.
 
-import type { Activity, AppState, Email, Id, LaunchDelay, Link, Person, RescheduleSuggestion, Role, Step, StepKey, Version } from './lib/types';
+import type { Activity, AppState, CreativeBrief, Email, Id, LaunchDelay, Link, Person, RescheduleSuggestion, Role, Step, StepKey, Version } from './lib/types';
 import {
   canComplete,
   defaultAssignee,
@@ -39,6 +39,9 @@ const checkTime = (t: unknown) => {
   return t;
 };
 const nowIso = () => new Date().toISOString();
+const BRIEF_KEYS: (keyof CreativeBrief)[] = ['goal', 'keyMessage', 'cta', 'notes', 'link'];
+const briefOf = (b: any): CreativeBrief => Object.fromEntries(BRIEF_KEYS.map((k) => [k, typeof b?.[k] === 'string' ? b[k] : ''])) as unknown as CreativeBrief;
+const briefFilled = (b: CreativeBrief) => BRIEF_KEYS.some((k) => b[k].trim());
 
 /** Run writes a few at a time (never two to the same doc at once — callers pass distinct docs). */
 async function inChunks(tasks: (() => Promise<unknown>)[], size = 6) {
@@ -145,6 +148,7 @@ export function createStore(db: any, user: any): Store {
         sendDate: r.sendDate,
         sendTime: r.sendTime ?? null,
         isLaunch: !!r.isLaunch,
+        brief: briefOf(r.brief),
         versions: (versBy.get(id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)),
       }))
       .filter((e) => DATE_RE.test(e.sendDate))
@@ -304,14 +308,14 @@ export function createStore(db: any, user: any): Store {
     return vid;
   };
 
-  const createEmail = async (p: { title: string; sendDate: string; sendTime?: string | null; isLaunch?: boolean; versions?: VersionInput[] }) => {
+  const createEmail = async (p: { title: string; sendDate: string; sendTime?: string | null; isLaunch?: boolean; brief?: CreativeBrief; versions?: VersionInput[] }) => {
     const title = (p.title ?? '').trim();
     if (!title) throw new UserError('Give the email a title.');
     const sendDate = checkDate(p.sendDate);
     const sendTime = checkTime(p.sendTime);
     const isLaunch = p.isLaunch ?? /\blaunch\b/i.test(title);
     const id = newId('emails');
-    await ref('emails', id).set({ title, sendDate, sendTime, isLaunch, createdAt: nowIso() });
+    await ref('emails', id).set({ title, sendDate, sendTime, isLaunch, brief: briefOf(p.brief), createdAt: nowIso() });
     const vs = p.versions?.length ? p.versions : [{ name: 'Main' }];
     for (let i = 0; i < vs.length; i++) await insertVersion({ id, sendDate, sendTime, isLaunch }, vs[i], i);
     await log(id, null, 'created', `created this email (${vs.map((v) => v.name).join(', ')})`);
@@ -357,6 +361,10 @@ export function createStore(db: any, user: any): Store {
       const upd: Row = {};
       if (patch.title !== undefined && patch.title.trim() && patch.title.trim() !== e.title) upd.title = patch.title.trim();
       if (patch.isLaunch !== undefined && !!patch.isLaunch !== e.isLaunch) upd.isLaunch = !!patch.isLaunch;
+      if (patch.brief) {
+        const nb = briefOf({ ...e.brief, ...patch.brief });
+        if (JSON.stringify(nb) !== JSON.stringify(e.brief)) upd.brief = nb;
+      }
       const sendDate = patch.sendDate !== undefined ? checkDate(patch.sendDate) : e.sendDate;
       const sendTime = patch.sendTime !== undefined ? checkTime(patch.sendTime) : e.sendTime;
       if (sendDate !== e.sendDate) upd.sendDate = sendDate;
@@ -375,6 +383,7 @@ export function createStore(db: any, user: any): Store {
         await log(id, null, 'edited', `moved the send to ${sendDate}${sendTime ? ' ' + sendTime : ''} (due dates updated)`);
       }
       if (upd.title) await log(id, null, 'edited', `renamed the email to “${upd.title}”`);
+      if (upd.brief) await log(id, null, 'edited', 'updated the creative brief');
       if ('isLaunch' in upd) {
         if (upd.isLaunch) await inChunks(e.versions.filter((v) => !v.city).map((v) => () => ref('versions', v.id).update({ city: v.name })));
         await log(id, null, 'edited', upd.isLaunch ? 'labeled this a launch email' : 'removed the launch email label');
@@ -396,7 +405,7 @@ export function createStore(db: any, user: any): Store {
 
     async duplicateEmail({ id }) {
       const e = email(id);
-      const nid = await createEmail({ title: `${e.title} (copy)`, sendDate: e.sendDate, sendTime: e.sendTime, isLaunch: e.isLaunch, versions: e.versions.map(versionInput) });
+      const nid = await createEmail({ title: `${e.title} (copy)`, sendDate: e.sendDate, sendTime: e.sendTime, isLaunch: e.isLaunch, brief: e.brief, versions: e.versions.map(versionInput) });
       await log(nid, null, 'created', `duplicated from “${e.title}”`);
       return { id: nid };
     },
@@ -454,6 +463,7 @@ export function createStore(db: any, user: any): Store {
       if (step.completedAt) return;
       const c = canComplete(step.key, v.steps, meP());
       if (!c.ok) throw new UserError(c.reason);
+      if (step.key === 'creative_brief' && !briefFilled(e.brief)) throw new UserError('Fill in the creative brief (at the top of this email) before submitting it.');
       await setDone(id);
       await log(e.id, v.id, 'step', `checked “${stepDef(step.key).label}” · ${v.name}`);
     },
@@ -508,6 +518,7 @@ export function createStore(db: any, user: any): Store {
         if (!r.ok) throw new UserError(r.reason);
         sim.find((s) => s.key === k)!.completedAt = null;
       }
+      if (plan.complete.includes('creative_brief') && !briefFilled(e.brief)) throw new UserError('Fill in the creative brief (open the email) before moving it past Briefs.');
       for (const k of plan.complete) {
         const c = canComplete(k, sim, meP());
         if (!c.ok) throw new UserError(c.reason);

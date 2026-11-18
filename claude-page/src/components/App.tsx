@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState } from '@/lib/types';
+import { ROLE_LABELS } from '@/lib/types';
 import { currentNow, emailHealth, HEALTH_LABEL, Health } from '@/lib/workflow';
 import { canApproveReschedule, canReportDelay } from '@/lib/launch';
 import { AppCtx, Avatar, Ctx } from './ui';
@@ -184,7 +185,7 @@ export default function App({ store }: { store: Store }) {
                   <div className="menu-head">
                     {state.me.name}
                     <small>
-                      {state.me.role === 'marketing' ? 'Marketing (Kori)' : state.me.role === 'ops' ? 'Ops' : 'Team member'}
+                      {ROLE_LABELS[state.me.role] ?? 'Team member'}
                       {state.me.isAdmin ? ' · Admin' : ''}
                     </small>
                   </div>

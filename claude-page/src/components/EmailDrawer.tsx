@@ -124,6 +124,7 @@ export default function EmailDrawer({ email, initialVersionId, onClose }: { emai
               .map(({ s, delay }) => (
                 <SuggestionCard key={s.id} s={s} delay={delay} />
               ))}
+            <BriefPanel email={email} />
             <VersionPanel email={email} version={version} onSwitch={setVid} />
             <ActivityPanel email={email} />
           </div>
@@ -194,7 +195,7 @@ function VersionPanel({ email, version, onSwitch }: { email: Email; version: Ver
             <Field label="Launch city (for launch delays)" value={version.city} onSave={(v) => save({ city: v })} wide placeholder="e.g. Chicago" />
           )}
           <Field label="Audience / segment" value={version.audience} onSave={(v) => save({ audience: v })} wide />
-          <Field label="Exclusions (one per line)" value={version.exclusions} onSave={(v) => save({ exclusions: v })} multiline wide />
+          <Field label="Exclusions — audience brief, noted by Ops (one per line)" value={version.exclusions} onSave={(v) => save({ exclusions: v })} multiline wide />
           <Field label="Subject line" value={version.subject} onSave={(v) => save({ subject: v })} wide placeholder="Not written yet" />
           <Field label="Preheader" value={version.preheader} onSave={(v) => save({ preheader: v })} wide />
           <Field label="Preview link" value={version.previewUrl} onSave={(v) => save({ previewUrl: v })} wide placeholder="https://…" link />
@@ -204,6 +205,46 @@ function VersionPanel({ email, version, onSwitch }: { email: Email; version: Ver
 
       <LinksPanel email={email} version={version} />
     </>
+  );
+}
+
+function BriefPanel({ email }: { email: Email }) {
+  const { act } = useApp();
+  const b = email.brief;
+  const filled = [b.goal, b.keyMessage, b.cta, b.notes, b.link].some((x) => x.trim());
+  const [open, setOpen] = useState(!filled);
+  const save = (k: keyof typeof b) => (v: string) => act('updateEmail', { id: email.id, patch: { brief: { [k]: v } } });
+  const briefStep = email.versions[0]?.steps.find((s) => s.key === 'creative_brief');
+  return (
+    <section className="panel brief">
+      <div className="panel-head">
+        <h3>
+          Creative brief <span className="muted-text">· shared by all versions</span>
+        </h3>
+        <div className="toolbar-group">
+          {briefStep?.completedAt ? <span className="tag ok">Submitted</span> : <span className="tag warn">Not submitted yet</span>}
+          <button className="btn btn-ghost sm" onClick={() => setOpen((o) => !o)}>
+            {open ? 'Collapse' : filled ? 'View / edit' : 'Write brief'}
+          </button>
+        </div>
+      </div>
+      {!open && filled && (
+        <p className="brief-summary">
+          {b.goal && <><b>Goal:</b> {b.goal} </>}
+          {b.keyMessage && <><b>Message:</b> {b.keyMessage}</>}
+        </p>
+      )}
+      {open && (
+        <div className="form-grid">
+          <Field label="Goal — what should this email achieve?" value={b.goal} onSave={save('goal')} wide multiline placeholder="e.g. Get Houston restaurants to book a free systems check" />
+          <Field label="Key message" value={b.keyMessage} onSave={save('keyMessage')} wide multiline placeholder="The one thing readers should remember" />
+          <Field label="Call to action / offer" value={b.cta} onSave={save('cta')} wide placeholder="e.g. Book your free systems check" />
+          <Field label="Notes for design (tone, imagery, must-haves)" value={b.notes} onSave={save('notes')} wide multiline />
+          <Field label="Brief doc link (optional)" value={b.link} onSave={save('link')} wide placeholder="https://docs.google.com/…" link />
+          <p className="small muted-text wide-note">When it’s ready, check “Creative Brief Submitted” in each version’s steps below.</p>
+        </div>
+      )}
+    </section>
   );
 }
 

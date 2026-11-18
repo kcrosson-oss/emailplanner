@@ -87,6 +87,9 @@ describe('dates & default due dates', () => {
     expect(defaultDue('design_approved_2', '2026-11-02', null)).toEqual({ dueDate: '2026-10-30', dueTime: null });
     expect(defaultDue('audience_approved_2', '2026-11-02', null)).toEqual({ dueDate: '2026-11-01', dueTime: '12:00' });
     expect(defaultDue('email_sent', '2026-11-02', '10:00')).toEqual({ dueDate: '2026-11-02', dueTime: '10:00' });
+    expect(defaultDue('creative_brief', '2026-12-08', null)).toEqual({ dueDate: '2026-11-28', dueTime: null });
+    expect(defaultDue('audience_brief', '2026-12-08', null)).toEqual({ dueDate: '2026-12-01', dueTime: null });
+    expect(defaultDue('test_send', '2026-12-08', null)).toEqual({ dueDate: '2026-12-06', dueTime: null });
   });
 
   it('flags weekend due dates', () => {
@@ -125,8 +128,27 @@ describe('who can check what', () => {
     expect(canComplete('design_approved_2', steps(['design_submitted']), admin).ok).toBe(false);
   });
 
-  it('anyone can submit; send requires everything else', () => {
-    expect(canComplete('design_submitted', steps([]), member).ok).toBe(true);
+  it('briefs come first: Kori writes the creative brief, Ops the audience brief', () => {
+    expect(canComplete('design_submitted', steps([]), member).ok).toBe(false);
+    expect(canComplete('audiences_submitted', steps(['creative_brief']), member).ok).toBe(false);
+    expect(canComplete('creative_brief', steps([]), kori).ok).toBe(true);
+    expect(canComplete('creative_brief', steps([]), ops).ok).toBe(false);
+    expect(canComplete('audience_brief', steps([]), ops).ok).toBe(true);
+    expect(canComplete('audience_brief', steps([]), kori).ok).toBe(false);
+  });
+
+  it('test send: after all approvals, signed off by Kori or Fran (brand)', () => {
+    const approved = steps(STEP_KEYS.filter((k) => k !== 'test_send' && k !== 'email_sent'));
+    const brand = { role: 'brand' as const, isAdmin: false };
+    expect(canComplete('test_send', steps(['creative_brief', 'design_submitted']), kori).ok).toBe(false);
+    expect(canComplete('test_send', approved, kori).ok).toBe(true);
+    expect(canComplete('test_send', approved, brand).ok).toBe(true);
+    expect(canComplete('test_send', approved, ops).ok).toBe(false);
+    expect(canComplete('design_approved_1', steps(['creative_brief', 'design_submitted']), brand).ok).toBe(false);
+  });
+
+  it('anyone can submit once briefed; send requires everything else', () => {
+    expect(canComplete('design_submitted', steps(['creative_brief']), member).ok).toBe(true);
     expect(canComplete('email_sent', steps(['design_submitted']), member).ok).toBe(false);
     expect(canComplete('email_sent', steps(STEP_KEYS.filter((k) => k !== 'email_sent')), member).ok).toBe(true);
   });
@@ -139,7 +161,7 @@ describe('who can check what', () => {
 
   it('request changes reopens the matching Submitted step', () => {
     expect(requestChangesPlan('audience_approved_2')).toEqual({
-      reopen: ['audiences_submitted', 'audience_approved_1', 'audience_approved_2'],
+      reopen: ['audiences_submitted', 'audience_approved_1', 'audience_approved_2', 'test_send'],
       flag: 'audiences_submitted',
     });
     expect(requestChangesPlan('design_approved_1').flag).toBe('design_submitted');
@@ -148,26 +170,30 @@ describe('who can check what', () => {
 });
 
 describe('board stages', () => {
+  const B: StepKey[] = ['creative_brief', 'audience_brief'];
   it('maps progress to columns', () => {
-    expect(stageOf(steps([]))).toBe('design');
-    expect(stageOf(steps(['audiences_submitted']))).toBe('design');
-    expect(stageOf(steps(['design_submitted']))).toBe('audience');
-    expect(stageOf(steps(['design_submitted', 'audiences_submitted', 'design_approved_1']))).toBe('kori');
-    expect(stageOf(steps(['design_submitted', 'audiences_submitted', 'design_approved_1', 'audience_approved_1']))).toBe('ops');
+    expect(stageOf(steps([]))).toBe('brief');
+    expect(stageOf(steps(['creative_brief']))).toBe('brief');
+    expect(stageOf(steps(B))).toBe('design');
+    expect(stageOf(steps([...B, 'audiences_submitted']))).toBe('design');
+    expect(stageOf(steps([...B, 'design_submitted']))).toBe('audience');
+    expect(stageOf(steps([...B, 'design_submitted', 'audiences_submitted', 'design_approved_1']))).toBe('kori');
+    expect(stageOf(steps([...B, 'design_submitted', 'audiences_submitted', 'design_approved_1', 'audience_approved_1']))).toBe('ops');
+    expect(stageOf(steps(STEP_KEYS.filter((k) => k !== 'email_sent' && k !== 'test_send')))).toBe('test');
     expect(stageOf(steps(STEP_KEYS.filter((k) => k !== 'email_sent')))).toBe('ready');
     expect(stageOf(steps(STEP_KEYS))).toBe('sent');
   });
 
   it('plans a drag forward and backward', () => {
-    expect(movePlan('kori', steps([]))).toEqual({ complete: ['design_submitted', 'audiences_submitted'], reopen: [] });
-    expect(movePlan('audience', steps(['design_submitted', 'audiences_submitted', 'design_approved_1']))).toEqual({
+    expect(movePlan('kori', steps([]))).toEqual({ complete: [...B, 'design_submitted', 'audiences_submitted'], reopen: [] });
+    expect(movePlan('audience', steps([...B, 'design_submitted', 'audiences_submitted', 'design_approved_1']))).toEqual({
       complete: [],
       reopen: ['audiences_submitted', 'design_approved_1'],
     });
   });
 
   it('counts progress', () => {
-    expect(progress(steps(['design_submitted', 'audiences_submitted', 'design_approved_1', 'audience_approved_1']))).toEqual({ done: 4, total: 7 });
+    expect(progress(steps([...B, 'design_submitted', 'audiences_submitted']))).toEqual({ done: 4, total: 10 });
   });
 });
 
