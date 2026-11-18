@@ -75,7 +75,20 @@ Other commands:
 
 ---
 
-## Put it online (Vercel + Neon), step by step
+## Put it online for free (Netlify + Neon)
+
+Netlify's free plan allows business use, and Neon's free plan covers the database. You'll need free accounts at **GitHub**, **Netlify** and **Neon**.
+
+1. **Database:** in [Neon](https://console.neon.tech), open your project and click **Connect**. Turn on **Connection pooling** and copy the `postgresql://…` string. Delete `&channel_binding=require` from the end if it's there.
+2. **Website:** go to [app.netlify.com/start](https://app.netlify.com/start) and choose **GitHub**, then pick the `emailplanner` repo. Netlify detects Next.js automatically, so leave the build settings as they are.
+3. Before deploying, open **Add environment variables** and add `DATABASE_URL`, `SESSION_SECRET` (any long random text) and `TEAM_PASSCODE`.
+4. Click **Deploy**. When it finishes you'll get a link like `something.netlify.app`. You can rename it under *Site configuration → Change site name*.
+
+Every push to GitHub redeploys the site automatically.
+
+## Alternative: Vercel + Neon
+
+> Vercel's free Hobby plan is for personal, non-commercial use only. A company tool needs Vercel Pro, which is paid.
 
 You'll need free accounts at **GitHub**, **Vercel** and **Neon**. Plan on about 15 minutes.
 

@@ -23,7 +23,7 @@ export const allowedDomain = () => (process.env.ALLOWED_DOMAIN || 'getresq.com')
 function secret(): string {
   const s = process.env.SESSION_SECRET;
   if (s) return s;
-  if (process.env.NODE_ENV === 'production' && process.env.VERCEL) throw new Error('SESSION_SECRET must be set in production.');
+  if (process.env.NODE_ENV === 'production') throw new Error('SESSION_SECRET must be set in production.');
   return 'local-dev-secret-change-me';
 }
 
