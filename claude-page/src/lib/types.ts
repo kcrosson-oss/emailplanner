@@ -54,8 +54,12 @@ export interface Version {
   steps: Step[];
 }
 
+import type { Category } from './categories';
+
 export interface CreativeBrief {
   goal: string;
+  audience: string; // who should receive it — Ops uses this for the audience brief
+  utmCampaign: string; // optional override of the utm_campaign value
   keyMessage: string;
   cta: string;
   notes: string;
@@ -67,7 +71,8 @@ export interface Email {
   title: string;
   sendDate: string;
   sendTime: string | null;
-  isLaunch: boolean; // labeled "Launch email"
+  category: Category;
+  isLaunch: boolean; // true for City Launch emails (used for launch delays)
   brief: CreativeBrief;
   versions: Version[];
 }

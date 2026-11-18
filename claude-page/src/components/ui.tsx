@@ -4,6 +4,7 @@ import { createContext, useContext } from 'react';
 import type { Activity, AppState, Email, Person, Step, Version } from '@/lib/types';
 import { Health, HEALTH_LABEL, Now, progress, stepHealth } from '@/lib/workflow';
 import { addDays, prettyDate, prettyTime, shortDate } from '@/lib/dates';
+import { categoryOf } from '@/lib/categories';
 
 export type Act = (type: string, payload?: Record<string, unknown>) => Promise<any>;
 
@@ -41,6 +42,15 @@ export function Avatar({ person, size = 22 }: { person?: Person | null; size?: n
   return (
     <span className="avatar" title={person.name} style={{ width: size, height: size, fontSize: size * 0.42, background: AVATAR_COLORS[[...person.id].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length] }}>
       {initials(person.name)}
+    </span>
+  );
+}
+
+export function CategoryBadge({ category, small }: { category: string; small?: boolean }) {
+  const c = categoryOf(category);
+  return (
+    <span className={`cat ${small ? 'sm' : ''}`} style={{ background: c.bg, color: c.color }}>
+      {c.label}
     </span>
   );
 }

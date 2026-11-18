@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { addDays } from '@/lib/dates';
 import { ROLE_LABELS, Role } from '@/lib/types';
+import { CATEGORIES, guessCategory, type Category } from '@/lib/categories';
 import type { Person } from '@/lib/types';
 import { Avatar, useApp } from './ui';
 
@@ -29,6 +30,8 @@ export function NewEmailModal({ onClose, onCreated }: { onClose: () => void; onC
   const [sendTime, setSendTime] = useState('');
   const [versions, setVersions] = useState('');
   const [copyFrom, setCopyFrom] = useState('');
+  const [category, setCategory] = useState<Category | ''>('');
+  const cat: Category = category || guessCategory(title);
   const [saving, setSaving] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -38,13 +41,13 @@ export function NewEmailModal({ onClose, onCreated }: { onClose: () => void; onC
     if (copyFrom) {
       // Duplicate an existing email, then rename/re-date the copy.
       r = await act('duplicateEmail', { id: copyFrom });
-      if (r?.id) await act('updateEmail', { id: r.id, patch: { title, sendDate, sendTime: sendTime || null } });
+      if (r?.id) await act('updateEmail', { id: r.id, patch: { title, sendDate, sendTime: sendTime || null, category: cat } });
     } else {
       const names = versions
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      r = await act('createEmail', { title, sendDate, sendTime: sendTime || null, versions: (names.length ? names : ['Main']).map((name) => ({ name, ownerId: state.me.id })) });
+      r = await act('createEmail', { title, sendDate, sendTime: sendTime || null, category: cat, versions: (names.length ? names : ['Main']).map((name) => ({ name, ownerId: state.me.id })) });
     }
     setSaving(false);
     if (r?.id) onCreated(r.id);
@@ -57,6 +60,22 @@ export function NewEmailModal({ onClose, onCreated }: { onClose: () => void; onC
           <span>Title / topic</span>
           <input autoFocus required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Houston Launch Email" />
         </label>
+        <div className="field">
+          <span>Category</span>
+          <div className="cat-pick">
+            {CATEGORIES.map((c) => (
+              <button
+                type="button"
+                key={c.id}
+                className={`cat-opt ${cat === c.id ? 'on' : ''}`}
+                style={cat === c.id ? { background: c.bg, color: c.color, borderColor: c.bg } : {}}
+                onClick={() => setCategory(c.id)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="row-2">
           <label className="field">
             <span>Send date</span>

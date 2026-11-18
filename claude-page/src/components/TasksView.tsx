@@ -5,7 +5,7 @@ import { addDays, isWeekend } from '@/lib/dates';
 import { canComplete, stepDef } from '@/lib/workflow';
 import { canApproveReschedule } from '@/lib/launch';
 import { pendingSuggestions, SuggestionCard } from './LaunchDelay';
-import { allTasks, Avatar, dueLabel, HealthDot, TaskRow, useApp, WeekendFlag } from './ui';
+import { allTasks, Avatar, CategoryBadge, dueLabel, HealthDot, TaskRow, useApp, WeekendFlag } from './ui';
 
 export default function TasksView() {
   const { state, now } = useApp();
@@ -96,7 +96,7 @@ function TaskLine({ t }: { t: TaskRow }) {
           {!check.ok && check.reason?.includes('first') && <span className="waiting">Waiting on earlier step</span>}
         </span>
         <span className="task-sub">
-          {t.email.title} · {t.version.name}
+          <CategoryBadge category={t.email.category} small /> {t.email.title} · {t.version.name}
         </span>
       </button>
       <span className={`task-due h-text-${t.health}`}>

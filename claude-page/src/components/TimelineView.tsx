@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { addDays, daysBetween, isWeekend, parseDate, shortDate } from '@/lib/dates';
 import { emailHealth, stepDef, stepHealth, versionHealth, worst } from '@/lib/workflow';
 import type { Step } from '@/lib/types';
-import { HealthDot, ProgressBar, useApp } from './ui';
+import { CategoryBadge, HealthDot, ProgressBar, useApp } from './ui';
 import { Legend } from './CalendarView';
 
 const COL = 34;
@@ -46,7 +46,11 @@ export default function TimelineView() {
           {emails.map((e) => (
             <div key={e.id}>
               <button className="tl-email-label" onClick={() => openEmail(e.id)}>
-                <HealthDot health={emailHealth(e.versions, now)} /> {e.title}
+                <HealthDot health={emailHealth(e.versions, now)} />
+                <span className="tl-title">
+                  <CategoryBadge category={e.category} small />
+                  <span>{e.title}</span>
+                </span>
               </button>
               {e.versions.map((v) => (
                 <button key={v.id} className="tl-version-label" onClick={() => openEmail(e.id, v.id)}>

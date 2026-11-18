@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import type { Activity, Email, Link, Step, Version } from '@/lib/types';
 import { isWeekend, prettyDate } from '@/lib/dates';
-import { tagUrl, topicSlug } from '@/lib/utm';
+import { campaignFor, tagUrl, utmParams } from '@/lib/utm';
+import { CATEGORIES } from '@/lib/categories';
 import { canComplete, emailHealth, hasRole, stepDef, stepHealth, versionHealth } from '@/lib/workflow';
 import { pendingSuggestions, SuggestionCard } from './LaunchDelay';
 import { Avatar, fmtStamp, HealthDot, HealthPill, personName, ProgressBar, useApp, WeekendFlag } from './ui';
@@ -32,6 +33,22 @@ export default function EmailDrawer({ email, initialVersionId, onClose }: { emai
       <div className="scrim" onClick={onClose} />
       <aside className="drawer" role="dialog" aria-label={email.title}>
         <div className="drawer-head">
+          <div className="cat-row">
+            <span className="muted-text small">Category</span>
+            <div className="cat-pick">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  className={`cat-opt ${email.category === c.id ? 'on' : ''}`}
+                  style={email.category === c.id ? { background: c.bg, color: c.color, borderColor: c.bg } : {}}
+                  onClick={() => email.category !== c.id && saveEmail({ category: c.id })}
+                  title={c.id === 'city_launch' ? 'City Launch emails are rescheduled when Ops reports a launch delay' : ''}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="drawer-title-row">
             <input
               key={`title-${email.title}`}
@@ -63,11 +80,8 @@ export default function EmailDrawer({ email, initialVersionId, onClose }: { emai
               <span className="muted-text">ET</span>
             </label>
             {isWeekend(email.sendDate) && <WeekendFlag />}
-            <label className={`launch-toggle ${email.isLaunch ? 'on' : ''}`} title="Launch emails get rescheduled when Ops reports a city launch delay">
-              <input type="checkbox" checked={email.isLaunch} onChange={(e) => saveEmail({ isLaunch: e.target.checked })} /> Launch email
-            </label>
-            <span className="utm-slug" title="UTM campaign (same for all versions)">
-              campaign: <code>{topicSlug(email.title)}</code>
+            <span className="utm-slug" title="UTM campaign (same for all versions — set it in the creative brief)">
+              utm_campaign: <code>{campaignFor(email)}</code>
             </span>
             <div className="spacer" />
             <button className="btn btn-ghost sm" onClick={async () => {
@@ -211,7 +225,7 @@ function VersionPanel({ email, version, onSwitch }: { email: Email; version: Ver
 function BriefPanel({ email }: { email: Email }) {
   const { act } = useApp();
   const b = email.brief;
-  const filled = [b.goal, b.keyMessage, b.cta, b.notes, b.link].some((x) => x.trim());
+  const filled = [b.goal, b.audience, b.keyMessage, b.cta, b.notes, b.link].some((x) => x.trim());
   const [open, setOpen] = useState(!filled);
   const save = (k: keyof typeof b) => (v: string) => act('updateEmail', { id: email.id, patch: { brief: { [k]: v } } });
   const briefStep = email.versions[0]?.steps.find((s) => s.key === 'creative_brief');
@@ -231,20 +245,62 @@ function BriefPanel({ email }: { email: Email }) {
       {!open && filled && (
         <p className="brief-summary">
           {b.goal && <><b>Goal:</b> {b.goal} </>}
+          {b.audience && <><b>Audience:</b> {b.audience} </>}
           {b.keyMessage && <><b>Message:</b> {b.keyMessage}</>}
         </p>
       )}
       {open && (
         <div className="form-grid">
           <Field label="Goal — what should this email achieve?" value={b.goal} onSave={save('goal')} wide multiline placeholder="e.g. Get Houston restaurants to book a free systems check" />
+          <Field
+            label="Audience — who gets this, any segments or exclusions (Ops uses this for the audience brief)"
+            value={b.audience}
+            onSave={save('audience')}
+            wide
+            multiline
+            placeholder="e.g. All Houston restaurant customers; exclude anyone who booked a systems check in the last 30 days"
+          />
           <Field label="Key message" value={b.keyMessage} onSave={save('keyMessage')} wide multiline placeholder="The one thing readers should remember" />
           <Field label="Call to action / offer" value={b.cta} onSave={save('cta')} wide placeholder="e.g. Book your free systems check" />
+          <Field
+            label="UTM campaign (leave blank to use the email title)"
+            value={b.utmCampaign}
+            onSave={save('utmCampaign')}
+            wide
+            placeholder={campaignFor({ title: email.title })}
+          />
+          <div className="field wide">
+            <span>UTM tags added to every link</span>
+            <div className="tagged">
+              <code>?{utmParams(email.sendDate, b.utmCampaign.trim() || email.title)}</code>
+              <CopyBtn text={`?${utmParams(email.sendDate, b.utmCampaign.trim() || email.title)}`} />
+            </div>
+          </div>
           <Field label="Notes for design (tone, imagery, must-haves)" value={b.notes} onSave={save('notes')} wide multiline />
           <Field label="Brief doc link (optional)" value={b.link} onSave={save('link')} wide placeholder="https://docs.google.com/…" link />
           <p className="small muted-text wide-note">When it’s ready, check “Creative Brief Submitted” in each version’s steps below.</p>
         </div>
       )}
     </section>
+  );
+}
+
+function CopyBtn({ text }: { text: string }) {
+  const { toast } = useApp();
+  return (
+    <button
+      className="btn btn-accent sm"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          toast('Copied', 'ok');
+        } catch {
+          toast('Your browser blocked copying — select the text and copy it by hand.');
+        }
+      }}
+    >
+      Copy
+    </button>
   );
 }
 
@@ -389,7 +445,7 @@ function LinksPanel({ email, version }: { email: Email; version: Version }) {
       toast('Your browser blocked copying — select the link and copy it by hand.');
     }
   };
-  const tagged = links.filter((l) => l.url.trim()).map((l) => ({ ...l, tagged: tagUrl(l.url, email.sendDate, email.title) }));
+  const tagged = links.filter((l) => l.url.trim()).map((l) => ({ ...l, tagged: tagUrl(l.url, email.sendDate, email.brief.utmCampaign.trim() || email.title) }));
 
   return (
     <section className="panel">
@@ -408,7 +464,7 @@ function LinksPanel({ email, version }: { email: Email; version: Version }) {
       </div>
       <div className="links">
         {links.map((l, i) => {
-          const t = l.url.trim() ? tagUrl(l.url, email.sendDate, email.title) : '';
+          const t = l.url.trim() ? tagUrl(l.url, email.sendDate, email.brief.utmCampaign.trim() || email.title) : '';
           const upd = (patch: Partial<Link>) => setLinks(links.map((x, j) => (j === i ? { ...x, ...patch } : x)));
           return (
             <div key={i} className="link-row">

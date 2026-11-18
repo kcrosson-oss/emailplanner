@@ -17,6 +17,7 @@ import {
   stepDef,
   STEP_KEYS,
 } from './lib/workflow';
+import { categoryOf, guessCategory, isCategory, type Category } from './lib/categories';
 import { affectedVersions, canApproveReschedule, canReportDelay, reschedulePlan, shiftDate, suggestSendDate } from './lib/launch';
 
 export class UserError extends Error {}
@@ -39,7 +40,7 @@ const checkTime = (t: unknown) => {
   return t;
 };
 const nowIso = () => new Date().toISOString();
-const BRIEF_KEYS: (keyof CreativeBrief)[] = ['goal', 'keyMessage', 'cta', 'notes', 'link'];
+const BRIEF_KEYS: (keyof CreativeBrief)[] = ['goal', 'audience', 'keyMessage', 'cta', 'utmCampaign', 'notes', 'link'];
 const briefOf = (b: any): CreativeBrief => Object.fromEntries(BRIEF_KEYS.map((k) => [k, typeof b?.[k] === 'string' ? b[k] : ''])) as unknown as CreativeBrief;
 const briefFilled = (b: CreativeBrief) => BRIEF_KEYS.some((k) => b[k].trim());
 
@@ -147,7 +148,8 @@ export function createStore(db: any, user: any): Store {
         title: r.title ?? 'Untitled',
         sendDate: r.sendDate,
         sendTime: r.sendTime ?? null,
-        isLaunch: !!r.isLaunch,
+        category: (isCategory(r.category) ? r.category : r.isLaunch ? 'city_launch' : 'general') as Category,
+        isLaunch: isCategory(r.category) ? r.category === 'city_launch' : !!r.isLaunch,
         brief: briefOf(r.brief),
         versions: (versBy.get(id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)),
       }))
@@ -308,14 +310,15 @@ export function createStore(db: any, user: any): Store {
     return vid;
   };
 
-  const createEmail = async (p: { title: string; sendDate: string; sendTime?: string | null; isLaunch?: boolean; brief?: CreativeBrief; versions?: VersionInput[] }) => {
+  const createEmail = async (p: { title: string; sendDate: string; sendTime?: string | null; isLaunch?: boolean; category?: Category; brief?: CreativeBrief; versions?: VersionInput[] }) => {
     const title = (p.title ?? '').trim();
     if (!title) throw new UserError('Give the email a title.');
     const sendDate = checkDate(p.sendDate);
     const sendTime = checkTime(p.sendTime);
-    const isLaunch = p.isLaunch ?? /\blaunch\b/i.test(title);
+    const category: Category = isCategory(p.category) ? p.category : p.isLaunch ? 'city_launch' : guessCategory(title);
+    const isLaunch = category === 'city_launch';
     const id = newId('emails');
-    await ref('emails', id).set({ title, sendDate, sendTime, isLaunch, brief: briefOf(p.brief), createdAt: nowIso() });
+    await ref('emails', id).set({ title, sendDate, sendTime, category, isLaunch, brief: briefOf(p.brief), createdAt: nowIso() });
     const vs = p.versions?.length ? p.versions : [{ name: 'Main' }];
     for (let i = 0; i < vs.length; i++) await insertVersion({ id, sendDate, sendTime, isLaunch }, vs[i], i);
     await log(id, null, 'created', `created this email (${vs.map((v) => v.name).join(', ')})`);
@@ -360,6 +363,10 @@ export function createStore(db: any, user: any): Store {
       const e = email(id);
       const upd: Row = {};
       if (patch.title !== undefined && patch.title.trim() && patch.title.trim() !== e.title) upd.title = patch.title.trim();
+      if (isCategory(patch.category) && patch.category !== e.category) {
+        upd.category = patch.category;
+        if ((patch.category === 'city_launch') !== e.isLaunch) upd.isLaunch = patch.category === 'city_launch';
+      }
       if (patch.isLaunch !== undefined && !!patch.isLaunch !== e.isLaunch) upd.isLaunch = !!patch.isLaunch;
       if (patch.brief) {
         const nb = briefOf({ ...e.brief, ...patch.brief });
@@ -384,9 +391,10 @@ export function createStore(db: any, user: any): Store {
       }
       if (upd.title) await log(id, null, 'edited', `renamed the email to “${upd.title}”`);
       if (upd.brief) await log(id, null, 'edited', 'updated the creative brief');
+      if (upd.category) await log(id, null, 'edited', `set the category to ${categoryOf(upd.category).label}`);
       if ('isLaunch' in upd) {
         if (upd.isLaunch) await inChunks(e.versions.filter((v) => !v.city).map((v) => () => ref('versions', v.id).update({ city: v.name })));
-        await log(id, null, 'edited', upd.isLaunch ? 'labeled this a launch email' : 'removed the launch email label');
+        if (!upd.category) await log(id, null, 'edited', upd.isLaunch ? 'labeled this a launch email' : 'removed the launch email label');
       }
     },
 
@@ -405,7 +413,7 @@ export function createStore(db: any, user: any): Store {
 
     async duplicateEmail({ id }) {
       const e = email(id);
-      const nid = await createEmail({ title: `${e.title} (copy)`, sendDate: e.sendDate, sendTime: e.sendTime, isLaunch: e.isLaunch, brief: e.brief, versions: e.versions.map(versionInput) });
+      const nid = await createEmail({ title: `${e.title} (copy)`, sendDate: e.sendDate, sendTime: e.sendTime, category: e.category, brief: e.brief, versions: e.versions.map(versionInput) });
       await log(nid, null, 'created', `duplicated from “${e.title}”`);
       return { id: nid };
     },
@@ -628,7 +636,7 @@ export function createStore(db: any, user: any): Store {
       } else {
         const names = moving.map((v) => v.name);
         target = newId('emails');
-        await ref('emails', target).set({ title: `${e.title} – ${names.join(' & ')}`, sendDate: finalDate, sendTime: e.sendTime, isLaunch: true, createdAt: nowIso() });
+        await ref('emails', target).set({ title: `${e.title} – ${names.join(' & ')}`, sendDate: finalDate, sendTime: e.sendTime, category: e.category, isLaunch: true, brief: e.brief, createdAt: nowIso() });
         await inChunks(moving.map((v, i) => () => ref('versions', v.id).update({ emailId: target, sortOrder: i })));
         await redate(moving, e.sendDate, finalDate, e.sendTime);
         await log(e.id, null, 'delay', `approved the reschedule: moved ${names.join(', ')} to a separate email on ${finalDate}`);

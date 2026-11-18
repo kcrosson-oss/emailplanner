@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { canComplete, nextStep, StageId, STAGES, stageOf, stepDef, stepHealth, versionHealth } from '@/lib/workflow';
 import { shortDate } from '@/lib/dates';
 import type { Email, Version } from '@/lib/types';
-import { Avatar, dueLabel, HealthDot, ProgressBar, useApp } from './ui';
+import { Avatar, CategoryBadge, dueLabel, HealthDot, ProgressBar, useApp } from './ui';
 import { Legend } from './CalendarView';
 
 export default function BoardView() {
@@ -87,6 +87,7 @@ function Card({ email, version, stage }: { email: Email; version: Version; stage
       onDragStart={(e) => e.dataTransfer.setData('text/plain', `${version.id}:${stage}`)}
       onClick={() => openEmail(email.id, version.id)}
     >
+      <CategoryBadge category={email.category} small />
       <div className="card-top">
         <span className="card-title">{email.title}</span>
         <HealthDot health={h} />

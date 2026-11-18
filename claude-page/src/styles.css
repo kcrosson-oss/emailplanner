@@ -396,3 +396,20 @@ textarea { resize: vertical; width: 100%; }
 .tag.ok { background: #e7f6ee; border-color: #b7e3c9; color: #15803d; }
 .tag.warn { background: #fff4ec; border-color: #fbd3bd; color: #9a3412; }
 .wide-note { grid-column: 1 / -1; margin: 0; }
+
+/* ---------- Categories ---------- */
+.cat { display: inline-block; align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; padding: 2px 8px; border-radius: 5px; white-space: nowrap; line-height: 1.4; }
+.cat.sm { font-size: 10px; padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.task-sub .cat { margin-right: 4px; vertical-align: 1px; }
+.tl-title { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tl-title span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-email-label { height: 46px !important; }
+.tl-row-email { height: 46px !important; }
+.cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.cat-pick { display: flex; gap: 6px; flex-wrap: wrap; }
+.cat-opt { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.cat-opt:hover { background: var(--tint); }
+.cat-opt.on.all { background: var(--ink); color: #fff; border-color: var(--ink); }
+.cat-opt b { margin-left: 4px; opacity: 0.75; }
+.catbar { display: flex; align-items: center; gap: 8px; padding: 10px 24px 0; background: #fff; flex-wrap: wrap; }
+.chip .cat { margin-bottom: 1px; }

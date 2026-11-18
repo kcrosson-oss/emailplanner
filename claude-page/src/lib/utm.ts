@@ -19,6 +19,9 @@ export function utmParams(sendDate: string, topic: string): string {
 
 const UTM_KEYS = new Set(['utm_source', 'utm_medium', 'utm_campaign']);
 
+/** The campaign slug an email uses: the brief's UTM campaign if filled in, else the title. */
+export const campaignFor = (e: { title: string; brief?: { utmCampaign?: string } }) => topicSlug(e.brief?.utmCampaign?.trim() || e.title);
+
 export function tagUrl(url: string, sendDate: string, topic: string): string {
   const raw = url.trim();
   if (!raw) return '';

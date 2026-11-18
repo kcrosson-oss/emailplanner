@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
+import { CATEGORIES, type Category } from '@/lib/categories';
 import { currentNow, emailHealth, HEALTH_LABEL, Health } from '@/lib/workflow';
 import { canApproveReschedule, canReportDelay } from '@/lib/launch';
 import { AppCtx, Avatar, Ctx } from './ui';
@@ -40,6 +41,7 @@ export default function App({ store }: { store: Store }) {
   const [menu, setMenu] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [dialogText, setDialogText] = useState('');
+  const [catFilter, setCatFilter] = useState<Category | 'all'>('all');
   const busy = useRef(0);
 
   useEffect(() => store.subscribe((s, st, err) => {
@@ -110,10 +112,14 @@ export default function App({ store }: { store: Store }) {
     [store, toast],
   );
 
+  const viewState = useMemo(
+    () => (state && catFilter !== 'all' ? { ...state, emails: state.emails.filter((e) => e.category === catFilter) } : state),
+    [state, catFilter],
+  );
   const ctx: Ctx | null = useMemo(
     () =>
-      state && {
-        state,
+      viewState && {
+        state: viewState,
         now,
         act,
         toast,
@@ -123,7 +129,7 @@ export default function App({ store }: { store: Store }) {
         searchPeople: store.searchPeople,
         openEmail: (emailId: string, versionId?: string) => setOpenId({ emailId, versionId }),
       },
-    [state, now, act, toast, ask, askText, store],
+    [viewState, now, act, toast, ask, askText, store],
   );
 
   const counts = useMemo(() => {
@@ -196,6 +202,26 @@ export default function App({ store }: { store: Store }) {
             </div>
           </div>
         </header>
+
+        <div className="catbar">
+          <span className="muted-text small">Show</span>
+          <button className={`cat-opt ${catFilter === 'all' ? 'on all' : ''}`} onClick={() => setCatFilter('all')}>
+            All emails <b>{state.emails.length}</b>
+          </button>
+          {CATEGORIES.map((c) => {
+            const n = state.emails.filter((e) => e.category === c.id).length;
+            return (
+              <button
+                key={c.id}
+                className={`cat-opt ${catFilter === c.id ? 'on' : ''}`}
+                style={catFilter === c.id ? { background: c.bg, color: c.color, borderColor: c.bg } : { borderLeft: `4px solid ${c.bg}` }}
+                onClick={() => setCatFilter(c.id)}
+              >
+                {c.label} <b>{n}</b>
+              </button>
+            );
+          })}
+        </div>
 
         <div className="summary">
           {(['overdue', 'today', 'soon', 'ontrack', 'done'] as Health[]).map((h) => (

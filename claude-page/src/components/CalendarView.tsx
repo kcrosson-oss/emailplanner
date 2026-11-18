@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { addDays, dayOfWeek, DOW_SHORT, monthLabel, parseDate, prettyDate, shortDate } from '@/lib/dates';
 import { emailHealth, HEALTH_LABEL, Health, stepDef, worst } from '@/lib/workflow';
 import type { Email } from '@/lib/types';
-import { allTasks, HealthDot, sendLabel, TaskRow, useApp } from './ui';
+import { allTasks, CategoryBadge, HealthDot, sendLabel, TaskRow, useApp } from './ui';
 import { pendingSuggestions } from './LaunchDelay';
 
 function startOfMonthGrid(anchor: string) {
@@ -153,10 +153,8 @@ function SendChip({ email, big }: { email: Email; big?: boolean }) {
   const h = emailHealth(email.versions, now);
   return (
     <button className={`chip h-chip-${h}`} onClick={() => openEmail(email.id)} title={`${email.title} — ${HEALTH_LABEL[h]}`}>
-      <span className="chip-title">
-        <span className="chip-send">✉</span> {email.title}
-        {email.isLaunch && <span className="launch-tag">Launch</span>}
-      </span>
+      <CategoryBadge category={email.category} small />
+      <span className="chip-title">{email.title}</span>
       {email.versions.length > 0 && <TotalProgress email={email} health={h} />}
       {big && <span className="chip-meta">{sendLabel(email)}</span>}
       <span className="chip-versions">
