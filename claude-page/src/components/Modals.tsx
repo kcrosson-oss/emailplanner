@@ -142,7 +142,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     <Modal title="People & roles" onClose={onClose} wide>
       <div className="modal-body">
         <p className="muted-text">
-          Roles decide who can check what: <b>Marketing (Kori)</b> submits the creative brief and checks Stage 1; <b>Ops</b> notes the audience brief, checks Stage 2 and reports launch delays; <b>Brand (Fran)</b> or Kori signs off the test send. Admins can do anything.
+          Tick <b>Briefs</b> to let someone submit steps 1–2 (creative brief and audience brief) whatever their role.
+          Slack reminders go to the work email shown here. Roles decide who can check what: <b>Marketing (Kori)</b> submits the creative brief and checks Stage 1; <b>Ops</b> notes the audience brief, checks Stage 2 and reports launch delays; <b>Brand (Fran)</b> or Kori signs off the test send. Admins can do anything.
           Anyone who opens the planner shows up here as a team member.
           {!admin && ' Only admins can change roles.'}
         </p>
@@ -152,6 +153,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <th />
               <th>Name</th>
               <th>Role</th>
+              <th title="Can submit the creative brief and audience brief (steps 1–2)">Briefs</th>
+              <th>Slack (work email)</th>
               <th>Admin</th>
               <th>Active</th>
             </tr>
@@ -175,6 +178,18 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                       </option>
                     ))}
                   </select>
+                </td>
+                <td>
+                  <input
+                    type="checkbox"
+                    title="Can submit steps 1–2 (creative brief + audience brief)"
+                    checked={p.canBrief || p.role === 'marketing' || p.role === 'ops' || p.isAdmin}
+                    disabled={!admin || p.role === 'marketing' || p.role === 'ops' || p.isAdmin}
+                    onChange={(e) => save({ id: p.id, canBrief: e.target.checked })}
+                  />
+                </td>
+                <td>
+                  <input key={p.slack} defaultValue={p.slack} disabled={!admin && p.id !== state.me.id} placeholder="name@getresq.com" onBlur={(e) => e.target.value.trim() !== p.slack && save({ id: p.id, slack: e.target.value })} />
                 </td>
                 <td>
                   <input type="checkbox" checked={p.isAdmin} disabled={!admin || p.id === state.me.id} onChange={(e) => save({ id: p.id, isAdmin: e.target.checked })} />

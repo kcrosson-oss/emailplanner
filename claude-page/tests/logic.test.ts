@@ -137,6 +137,14 @@ describe('who can check what', () => {
     expect(canComplete('audience_brief', steps([]), kori).ok).toBe(false);
   });
 
+  it('a brief writer (e.g. Christian) can submit both briefs but no approvals', () => {
+    const writer = { role: 'member' as const, isAdmin: false, canBrief: true };
+    expect(canComplete('creative_brief', steps([]), writer).ok).toBe(true);
+    expect(canComplete('audience_brief', steps([]), writer).ok).toBe(true);
+    expect(canComplete('design_approved_1', steps(['creative_brief', 'design_submitted']), writer).ok).toBe(false);
+    expect(canComplete('creative_brief', steps([]), member).ok).toBe(false);
+  });
+
   it('test send: after all approvals, signed off by Kori or Fran (brand)', () => {
     const approved = steps(STEP_KEYS.filter((k) => k !== 'test_send' && k !== 'email_sent'));
     const brand = { role: 'brand' as const, isAdmin: false };

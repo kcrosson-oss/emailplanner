@@ -99,10 +99,12 @@ export function createStore(db: any, user: any): Store {
         role: (r.role as Role) ?? 'member',
         isAdmin: !!r.isAdmin,
         active: r.active !== false,
+        canBrief: !!r.canBrief,
+        slack: r.slack || names.get(id)?.email || '',
       }))
       .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
     let me = people.find((p) => p.id === meId);
-    if (!me) me = { id: meId, name: names.get(meId)?.name || 'You', email: null, role: owner ? 'marketing' : 'member', isAdmin: owner, active: true };
+    if (!me) me = { id: meId, name: names.get(meId)?.name || 'You', email: null, role: owner ? 'marketing' : 'member', isAdmin: owner, active: true, canBrief: false, slack: '' };
     if (owner) me = { ...me, isAdmin: true };
 
     const stepsBy = new Map<string, Step[]>();
@@ -183,6 +185,16 @@ export function createStore(db: any, user: any): Store {
     try {
       const ps = await user.profiles(ids);
       for (const id of ids) names.set(id, { name: ps?.[id]?.name || '', email: ps?.[id]?.email });
+      // Keep each person's name + work email on their record so Slack reminders can find them.
+      for (const id of ids) {
+        const r = rows.people.get(id);
+        const n = names.get(id);
+        if (!r || !n) continue;
+        const upd: Row = {};
+        if (n.name && r.label !== n.name) upd.label = n.name;
+        if (n.email && !r.slack) upd.slack = n.email;
+        if (Object.keys(upd).length && (id === meId || owner)) await db.collection('people').doc(id).update(upd).catch(() => {});
+      }
     } catch {
       /* names are cosmetic */
     }
@@ -546,7 +558,8 @@ export function createStore(db: any, user: any): Store {
 
     async savePerson({ person }) {
       const me = meP();
-      if (!me.isAdmin) throw new UserError('Only admins can edit the people list.');
+      const ownSlackOnly = person.id === meId && Object.keys(person).every((k) => k === 'id' || k === 'slack');
+      if (!me.isAdmin && !ownSlackOnly) throw new UserError('Only admins can edit the people list.');
       const id: string = person.id;
       if (!id) throw new UserError('Pick someone first.');
       const cur = rows.people.get(id);
@@ -555,6 +568,8 @@ export function createStore(db: any, user: any): Store {
         role: person.role ?? cur?.role ?? 'member',
         isAdmin: person.isAdmin ?? cur?.isAdmin ?? false,
         active: person.active ?? cur?.active ?? true,
+        canBrief: person.canBrief ?? cur?.canBrief ?? false,
+        slack: (person.slack ?? cur?.slack ?? '').trim(),
         ...(person.label ? { label: person.label } : {}),
       };
       await ref('people', id).set({ ...(cur ?? {}), ...next });

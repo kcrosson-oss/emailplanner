@@ -16,6 +16,8 @@ export interface Person {
   role: Role;
   isAdmin: boolean;
   active: boolean;
+  canBrief: boolean; // may submit the creative + audience briefs (steps 1–2) whatever their role
+  slack: string; // work email used to find them in Slack for turn reminders
 }
 
 export interface Link {

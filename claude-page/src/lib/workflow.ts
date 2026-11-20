@@ -94,10 +94,15 @@ export const allowedRoles = (key: StepKey): Role[] => {
 const ROLE_NAMES: Record<Role, string> = { marketing: 'Marketing (Kori)', ops: 'Ops', brand: 'Brand (Fran)', member: 'Team member' };
 
 /** Role rule only: can this person check this step? */
-export function hasRole(key: StepKey, user: Pick<Person, 'role' | 'isAdmin'>): Check {
+type Who = Pick<Person, 'role' | 'isAdmin'> & { canBrief?: boolean };
+
+export const isBriefStep = (key: StepKey) => key === 'creative_brief' || key === 'audience_brief';
+
+export function hasRole(key: StepKey, user: Who): Check {
   const def = stepDef(key);
   const roles = allowedRoles(key);
   if (!roles.length || user.isAdmin || roles.includes(user.role)) return { ok: true };
+  if (isBriefStep(key) && user.canBrief) return { ok: true };
   const who = roles.map((r) => ROLE_NAMES[r]).join(' or ');
   const what = def.kind === 'approve' ? `Stage ${def.stage} approvals` : `“${def.short}”`;
   return { ok: false, reason: `Only ${who} can check ${what} (an admin can override).` };
@@ -125,7 +130,7 @@ export function prerequisitesMet(key: StepKey, steps: Done[]): Check {
   return { ok: true };
 }
 
-export function canComplete(key: StepKey, steps: Done[], user: Pick<Person, 'role' | 'isAdmin'>): Check {
+export function canComplete(key: StepKey, steps: Done[], user: Who): Check {
   const order = prerequisitesMet(key, steps);
   if (!order.ok) return order;
   return hasRole(key, user);
